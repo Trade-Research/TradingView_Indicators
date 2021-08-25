@@ -1,0 +1,400 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © GOJWH
+
+//@version=4
+study(title="BINANCE TRIPLE RSI", shorttitle="RSI", format=format.price, precision=2, resolution="")
+src = input(close, "Source", type = input.source)
+
+flen = input(14, minval=1, title="#1 Length")
+fup = rma(max(change(src), 0), flen)
+fdown = rma(-min(change(src), 0), flen)
+drsi = fdown == 0 ? 100 : fup == 0 ? 0 : 100 - (100 / (1 + fup / fdown))
+plot(drsi, "#1 RSI", color=#f0b90b)
+
+slen = input(35, minval=1, title="#2 Length")
+sup = rma(max(change(src), 0), slen)
+sdown = rma(-min(change(src), 0), slen)
+srsi = sdown == 0 ? 100 : sup == 0 ? 0 : 100 - (100 / (1 + sup / sdown))
+plot(srsi, "#2 RSI", color=#a61b61)
+
+tlen = input(70, minval=1, title="#3 Length")
+tup = rma(max(change(src), 0), tlen)
+tdown = rma(-min(change(src), 0), tlen)
+trsi = tdown == 0 ? 100 : tup == 0 ? 0 : 100 - (100 / (1 + tup / tdown))
+plot(trsi, "#3 RSI", color=#44db5e)
+
+f0 = hline(85, title="max", linestyle=hline.style_solid, linewidth=1, color=color.new(#ffffff, 100), editable=false)
+f9 = hline(15, title="min", linestyle=hline.style_solid, linewidth=1, color=color.new(#ffffff, 100), editable=false)
+
+//Divergence
+
+lbR = input(title="Pivot Lookback Right", defval=3, group="Divergence")
+lbL = input(title="Pivot Lookback Left", defval=3, group="Divergence")
+rangeUpper = input(title="Max of Lookback Range", defval=52, group="Divergence")
+rangeLower = input(title="Min of Lookback Range", defval=4, group="Divergence")
+plotBull = input(title="Plot Bullish |", defval=true, group="Divergence", inline="Bullish")
+plotHiddenBull = input(title="Plot Hidden Bullish", defval=true, group="Divergence", inline="Bullish")
+plotBear = input(title="Plot Bearish |", defval=true, group="Divergence", inline="Bearlish")
+plotHiddenBear = input(title="Plot Hidden Bearish", defval=true, group="Divergence", inline="Bearlish")
+
+bullColor = color.new(#1848cc, 20)
+bearColor = color.new(#d32f2f, 20)
+hiddenBullColor = color.new(#1848cc,20)
+hiddenBearColor = color.new(#d32f2f,20)
+textColor = color.new(#ffffff, 0)
+noneColor = color.new(#ffffff, 100)
+
+
+plFound = na(pivotlow(drsi, lbL, lbR)) ? false : true
+phFound = na(pivothigh(drsi, lbL, lbR)) ? false : true
+plFound2 = na(pivotlow(drsi, lbL*10, lbR)) ? false : true
+phFound2 = na(pivothigh(drsi, lbL*10, lbR)) ? false : true
+plFound3 = na(pivotlow(drsi, lbL*20, lbR)) ? false : true
+phFound3 = na(pivothigh(drsi, lbL*20, lbR)) ? false : true
+
+_inRange(cond) =>
+    bars = barssince(cond == true)
+    rangeLower <= bars and bars <= rangeUpper
+
+
+// Regular Bullish
+
+// Osc: Higher Low
+oscHL = drsi[lbR] > valuewhen(plFound, drsi[lbR], 1) and _inRange(plFound[1])
+
+// Price: Lower Low
+priceLL = low[lbR] < valuewhen(plFound, low[lbR], 1)
+
+bullCond = plotBull and priceLL and oscHL and plFound
+
+
+oscHL2 = drsi[lbR] > valuewhen(plFound2, drsi[lbR], 1) and _inRange(plFound2[1])
+
+// Price: Lower Low
+priceLL2 = low[lbR] < valuewhen(plFound2, low[lbR], 1)
+
+bullCond2 = plotBull and priceLL2 and oscHL2 and plFound2
+
+oscHL3 = drsi[lbR] > valuewhen(plFound3, drsi[lbR], 1) and _inRange(plFound3[1])
+
+// Price: Lower Low
+priceLL3 = low[lbR] < valuewhen(plFound3, low[lbR], 1)
+
+bullCond3 = plotBull and priceLL3 and oscHL3 and plFound3
+
+plot(
+   plFound ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bullish",
+   linewidth=2,
+   color=(bullCond ? bullColor : noneColor),
+   editable=true)
+
+plotshape(
+   bullCond ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bullish Label",
+   text="D",
+   style=shape.labelup,
+   location=location.absolute,
+   color=bullColor,
+   textcolor=textColor,
+   editable=true)
+   
+plot(
+  plFound2 ? drsi[lbR] : na,
+  offset=-lbR,
+  title="Regular Bullish",
+  linewidth=2,
+  color=(bullCond2 ? bullColor : noneColor),
+  editable=true)
+
+plotshape(
+  bullCond2 ? drsi[lbR] : na,
+  offset=-lbR,
+  title="Regular Bullish Label",
+  text="D",
+  style=shape.labelup,
+  location=location.absolute,
+  color=bullColor,
+  textcolor=textColor,
+  size=size.normal,
+  editable=true)
+   
+plot(
+   plFound3 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bullish",
+   linewidth=2,
+   color=(bullCond3 ? bullColor : noneColor),
+   editable=true)
+
+plotshape(
+   bullCond3 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bullish Label",
+   text="D",
+   style=shape.labelup,
+   location=location.absolute,
+   color=bullColor,
+   size=size.large,
+   textcolor=textColor,
+   editable=true)
+
+
+// Hidden Bullish
+
+// Osc: Lower Low
+oscLL = drsi[lbR] < valuewhen(plFound, drsi[lbR], 1) and _inRange(plFound[1])
+
+// Price: Higher Low
+priceHL = low[lbR] > valuewhen(plFound, low[lbR], 1)
+
+hiddenBullCond = plotHiddenBull and priceHL and oscLL and plFound
+
+// Osc: Lower Low
+oscLL2 = drsi[lbR] < valuewhen(plFound2, drsi[lbR], 1) and _inRange(plFound2[1])
+
+// Price: Higher Low
+priceHL2 = low[lbR] > valuewhen(plFound2, low[lbR], 1)
+
+hiddenBullCond2 = plotHiddenBull and priceHL2 and oscLL2 and plFound2
+
+// Osc: Lower Low
+oscLL3 = drsi[lbR] < valuewhen(plFound3, drsi[lbR], 1) and _inRange(plFound3[1])
+
+// Price: Higher Low
+priceHL3 = low[lbR] > valuewhen(plFound3, low[lbR], 1)
+
+hiddenBullCond3 = plotHiddenBull and priceHL3 and oscLL3 and plFound3
+
+plot(
+   plFound ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bullish",
+   linewidth=2,
+   color=(hiddenBullCond ? hiddenBullColor : noneColor),
+   editable=true)
+
+plotshape(
+   hiddenBullCond ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bullish Label",
+   text="H",
+   style=shape.labelup,
+   location=location.absolute,
+   color=bullColor,
+   textcolor=textColor,
+   editable=true)
+
+plot(
+   plFound2 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bullish",
+   linewidth=2,
+   color=(hiddenBullCond2 ? hiddenBullColor : noneColor),
+   editable=true)
+
+plotshape(
+   hiddenBullCond2 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bullish Label",
+   text="H",
+   style=shape.labelup,
+   location=location.absolute,
+   size=size.normal,
+   color=bullColor,
+   textcolor=textColor,
+   editable=true)
+   
+plot(
+   plFound3 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bullish",
+   linewidth=2,
+   color=(hiddenBullCond3 ? hiddenBullColor : noneColor),
+   editable=true)
+
+plotshape(
+   hiddenBullCond3 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bullish Label",
+   text="H",
+   style=shape.labelup,
+   location=location.absolute,
+   color=bullColor,
+   size=size.large,
+   textcolor=textColor,
+   editable=true)
+
+// Regular Bearish
+
+// Osc: Lower High
+oscLH = drsi[lbR] < valuewhen(phFound, drsi[lbR], 1) and _inRange(phFound[1])
+
+// Price: Higher High
+priceHH = high[lbR] > valuewhen(phFound, high[lbR], 1)
+
+bearCond = plotBear and priceHH and oscLH and phFound
+
+oscLH2 = drsi[lbR] < valuewhen(phFound2, drsi[lbR], 1) and _inRange(phFound2[1])
+
+// Price: Higher High
+priceHH2 = high[lbR] > valuewhen(phFound2, high[lbR], 1)
+
+bearCond2 = plotBear and priceHH2 and oscLH2 and phFound2
+
+
+oscLH3 = drsi[lbR] < valuewhen(phFound3, drsi[lbR], 1) and _inRange(phFound3[1])
+
+// Price: Higher High
+priceHH3 = high[lbR] > valuewhen(phFound3, high[lbR], 1)
+
+bearCond3 = plotBear and priceHH3 and oscLH3 and phFound3
+
+
+plot(
+   phFound ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bearish",
+   linewidth=2,
+   color=(bearCond ? bearColor : noneColor),
+   editable=true)
+
+plotshape(
+   bearCond ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bearish Label",
+   text="D",
+   style=shape.labeldown,
+   location=location.absolute,
+   color=bearColor,
+   textcolor=textColor,
+   editable=true)
+   
+plot(
+   phFound2 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bearish",
+   linewidth=2,
+   color=(bearCond2 ? bearColor : noneColor),
+   editable=true)
+
+plotshape(
+   bearCond2 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bearish Label",
+   text="D",
+   style=shape.labeldown,
+   location=location.absolute,
+   color=bearColor,
+   size=size.normal,
+   textcolor=textColor,
+   editable=true)
+   
+plot(
+   phFound3 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bearish",
+   linewidth=2,
+   color=(bearCond3 ? bearColor : noneColor),
+   editable=true)
+
+plotshape(
+   bearCond3 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Regular Bearish Label",
+   text="D",
+   style=shape.labeldown,
+   location=location.absolute,
+   color=bearColor,
+   size=size.large,
+   textcolor=textColor,
+   editable=true)
+
+
+// Hidden Bearish
+
+// Osc: Higher High
+oscHH = drsi[lbR] > valuewhen(phFound, drsi[lbR], 1) and _inRange(phFound[1])
+
+// Price: Lower High
+priceLH = high[lbR] < valuewhen(phFound, high[lbR], 1)
+
+hiddenBearCond = plotHiddenBear and priceLH and oscHH and phFound
+
+// Osc: Higher High
+oscHH2 = drsi[lbR] > valuewhen(phFound2, drsi[lbR], 1) and _inRange(phFound2[1])
+
+// Price: Lower High
+priceLH2 = high[lbR] < valuewhen(phFound2, high[lbR], 1)
+
+hiddenBearCond2 = plotHiddenBear and priceLH2 and oscHH2 and phFound2
+
+// Osc: Higher High
+oscHH3 = drsi[lbR] > valuewhen(phFound, drsi[lbR], 1) and _inRange(phFound3[1])
+
+// Price: Lower High
+priceLH3 = high[lbR] < valuewhen(phFound, high[lbR], 1)
+
+hiddenBearCond3 = plotHiddenBear and priceLH3 and oscHH3 and phFound3
+
+plot(
+   phFound ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bearish",
+   linewidth=2,
+   color=(hiddenBearCond ? hiddenBearColor : noneColor),
+   editable=true)
+
+plotshape(
+   hiddenBearCond ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bearish Label",
+   text="H",
+   style=shape.labeldown,
+   location=location.absolute,
+   color=bearColor,
+   textcolor=textColor,
+   editable=true)
+   
+plot(
+   phFound2 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bearish",
+   linewidth=2,
+   color=(hiddenBearCond2 ? hiddenBearColor : noneColor),
+   editable=true)
+
+plotshape(
+   hiddenBearCond2 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bearish Label",
+   text="H",
+   style=shape.labeldown,
+   location=location.absolute,
+   color=bearColor,
+   size=size.normal,
+   textcolor=textColor,
+   editable=true)
+   
+plot(
+   phFound3 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bearish",
+   linewidth=2,
+   color=(hiddenBearCond3 ? hiddenBearColor : noneColor),
+   editable=true)
+
+plotshape(
+   hiddenBearCond3 ? drsi[lbR] : na,
+   offset=-lbR,
+   title="Hidden Bearish Label",
+   text="H",
+   style=shape.labeldown,
+   location=location.absolute,
+   color=bearColor,
+   size=size.normal,
+   textcolor=textColor,
+   editable=true)
+   

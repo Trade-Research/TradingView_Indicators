@@ -1,0 +1,308 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Yechankun, redniche
+//@version=4
+study(title="Money Flow Index", shorttitle="DIV_MFI", format=format.price, precision=2)
+
+rsiLen      = input(14, type=input.integer, title="RSI Length", minval=1, group = "RSI", maxval=2000)
+
+overbuy         = input(80, type=input.float, title="Overbuy", minval=0, maxval=100, group = "Overbuy - Oversell")
+oversell        = input(20, type=input.float, title="Oversell", minval=0, maxval=100, group = "Overbuy - Oversell")
+useFillObOs     = input(true, "Fill overbuy / oversell area", input.bool, group = "Overbuy - Oversell")
+useBgObOs       = input(true, "Plot background on overbuy / oversell", input.bool, group = "Overbuy - Oversell")
+
+//  DIVERGENCE INPUT
+//--------------------------------------------------------------------------------------------------------------------------
+priceTopBotSource = input("High / Low",options=["High / Low","close"],title="Price top / bot source",group="Input")
+loopback		= input(defval=20, minval=1, title="Loopback", group = "Divergence")
+confirmation 	= input(defval=1, minval=1, title="Confirmation", group = "Divergence")
+posistionConf 	= input(defval=3, minval=3, title="Position Confirmation", group = "Divergence")
+topLimit       = input(65, type=input.float, title="Top Detection Limit", minval=0, maxval=100, group = "Divergence")
+botLimit       = input(35, type=input.float, title="Bottom Detection Limit", minval=0, maxval=100, group = "Divergence")
+maxLoopback	= input(defval=60, minval=1, title="Max Divergence Loopback", group = "Divergence")
+minLoopback	= input(defval=3, minval=1, title="Min Divergence Loopback", group = "Divergence")
+showToBotDiv    = input(true, "Highlight Div Top / Bot", input.bool, group = "Divergence")
+error_per 	= input(defval=0, type=input.float, minval=0, maxval=1, title="error_persent", group = "Divergence")
+
+//  COLOR
+//--------------------------------------------------------------------------------------------------------------------------
+rsiLineColor 	    = input(title="RSI line", type=input.color, defval=#7E57C2)
+obOsLineColor = input(title="Overbuy / oversell line", type=input.color, defval=color.gray)
+fillObColor    = input(title="Fill overbuy", type=input.color, defval=#2caa83)
+fillOsColor    = input(title="Fill oversell", type=input.color, defval=#cc141e)
+bgObColor    = input(title="Background overbuy", type=input.color, defval=#2caa83)
+bgOsColor    = input(title="Background oversell", type=input.color, defval=#cc141e)
+divLineColor  = input(title="Divergence line", type=input.color, defval=color.yellow)
+topColor  = input(title="Divergence top", type=input.color, defval=#2caa83)
+botColor  = input(title="Divergence bot", type=input.color, defval=#cc141e)
+textColor = input(title="Divergence text", type=input.color, defval=#ffffff)
+bigOverBuyColor = input(title="Big over buy", type=input.color, defval=#f0b90b)
+
+
+_rsi2     = rsi(close, rsiLen)
+
+src = hlc3
+upper = sum(volume * (change(src) <= 0 ? 0 : src), rsiLen)
+lower = sum(volume * (change(src) >= 0 ? 0 : src), rsiLen)
+_rsi(upper, lower) =>
+    100.0 - (100.0 / (1.0 + upper / lower))
+mf = _rsi(upper, lower)
+
+rsi_ratio_bot = mf/_rsi2*oversell
+plot(rsi_ratio_bot, "mf_rsi_ratio_bot", color=#2caa83)
+
+rsi_ratio_top = mf/_rsi2*overbuy
+plot(rsi_ratio_top, "mf_rsi_ratio_top", color=#cc141e)
+
+  
+
+//  PLOT INDICATOR
+//--------------------------------------------------------------------------------------------------------------------------
+hline(overbuy, linestyle= hline.style_dotted, color=obOsLineColor)
+hline(oversell, linestyle= hline.style_dotted, color=obOsLineColor)
+
+rsiPlot = plot(mf, "MF", color=rsiLineColor)
+
+upperLine = plot(overbuy, color=color.new(color.black, 100))
+lowerLine = plot(oversell, color=color.new(color.black, 100))
+fill(rsiPlot, upperLine, color=useFillObOs and mf > overbuy ? color.new(fillObColor, 50) : na)
+fill(rsiPlot, lowerLine, color=useFillObOs and mf < oversell ? color.new(fillOsColor, 50) : na)
+
+
+bgcolor(useBgObOs and mf > overbuy ? color.new(bgObColor, 70) : na)
+bgcolor(useBgObOs and mf < oversell ? color.new(bgOsColor, 70) : na)
+
+//	TOP / BOT FINDER
+//-----------------------------
+current = nz(mf[confirmation])
+
+
+//	FIND TOP / BOT
+//-----------------------------
+isTop = true
+isBot = true
+for i = 0 to (loopback + confirmation)
+    if mf[i] > current * (1 + error_per) or current < 50
+        isTop := false
+    if  mf[i] < current * (1 - error_per) or current > 50
+        isBot := false
+
+noneColor = color.new(#ffffff, 100)
+_inRange(cond) =>
+    bars = barssince(cond == true)
+    minLoopback <= bars and bars <= maxLoopback
+
+plFound = na(pivotlow(mf, confirmation, confirmation)) ? false : true
+phFound = na(pivothigh(mf, confirmation, confirmation)) ? false : true
+// Regular Bullish
+// Osc: Higher Low
+oscHL = mf[confirmation] > valuewhen(plFound, mf[confirmation], 1) and _inRange(plFound[1])
+// Price: Lower Low
+priceLL = low[confirmation] < valuewhen(plFound, low[confirmation], 1)
+
+
+bullCond = showToBotDiv and priceLL and oscHL and plFound
+
+plot(
+   plFound ? mf[confirmation] : na,
+   offset=-confirmation,
+   title="Regular Bullish",
+   linewidth=2,
+   color=(bullCond ? botColor : noneColor),
+   editable=true)
+
+plotshape(
+   bullCond ? mf[confirmation] - 50: na,
+   offset=-confirmation,
+   title="Regular Bullish Label",
+   text="D?",
+   style=shape.labelup,
+   location=location.absolute,
+   color=botColor,
+   textcolor=textColor,
+   editable=true)
+
+
+// Regular Bearish
+// Osc: Lower High
+oscLH = mf[confirmation] < valuewhen(phFound, mf[confirmation], 1) and _inRange(phFound[1])
+// Price: Higher High
+priceHH = high[confirmation] > valuewhen(phFound, high[confirmation], 1)
+
+bearCond = showToBotDiv and priceHH and oscLH and phFound
+
+plot(
+   phFound ? mf[confirmation] : na,
+   offset=-confirmation,
+   title="Regular Bearish",
+   linewidth=2,
+   color=(bearCond ? topColor : noneColor),
+   editable=true)
+plotshape(
+   bearCond ? mf[confirmation] + 50: na,
+   offset=-confirmation,
+   title="Regular Bearish Label",
+   text="D?",
+   style=shape.labeldown,
+   location=location.absolute,
+   color=topColor,
+   textcolor=textColor,
+   editable=true)
+
+
+//	IS TOP
+//-----------------------------
+var top1 = 0.0
+var top2 = 0.0
+var top3 = 0.0
+
+var priceTop1 = 0.0
+var priceTop2 = 0.0
+var priceTop3 = 0.0
+
+var top1Time = 0
+var top2Time = 0
+var top3Time = 0
+
+var top1BarIndex = 0
+var top2BarIndex = 0
+var top3BarIndex = 0
+
+var masterTopTime = 0
+var masterTopBarIndex = 0
+var masterTopRsiValue = 0.0
+var masterTopPriceValue = 0.0
+
+if (isTop)
+    top3 := top2
+    top2 := top1
+    top1 := current
+    priceTop3 := priceTop2
+    priceTop2 := priceTop1
+    priceTop1 := priceTopBotSource == "close" ? close[confirmation] : high[confirmation]
+    top3Time := top2Time
+    top2Time := top1Time
+    top1Time := time[confirmation]
+    top3BarIndex := top2BarIndex
+    top2BarIndex := top1BarIndex
+    top1BarIndex := bar_index[confirmation]
+
+isMasterTop = top3 < top2 and top2 > top1 and top2 > overbuy
+
+
+
+if (isMasterTop)
+    masterTopTime := top2Time
+    masterTopBarIndex := top2BarIndex
+    masterTopRsiValue := top2
+    masterTopPriceValue := priceTop2
+
+if (top1BarIndex - masterTopBarIndex > maxLoopback)
+    masterTopTime := 0
+    masterTopBarIndex := 0
+    masterTopRsiValue := 0.0
+    masterTopPriceValue := 0.0
+    
+current_price = nz(mf[confirmation])
+isBearDiv = (isTop and not isMasterTop and top1 > topLimit and top1 < masterTopRsiValue and priceTop1 > masterTopPriceValue and top1BarIndex - masterTopBarIndex <= maxLoopback) or false
+
+
+var line bearDivLine = na
+if (isBearDiv)
+    bearDivLine := line.new(x1=masterTopTime, y1=masterTopRsiValue, x2=top1Time, y2=top1, color=color.new(divLineColor, 0), xloc=xloc.bar_time, style=line.style_solid, width=1)
+
+
+plotshape(isBearDiv and showToBotDiv ? current + 10 : na, style=shape.triangledown, location= location.absolute, color=topColor, offset=-confirmation, size= size.tiny)
+
+//	IS BOT
+//-----------------------------
+var bot1 = 0.0
+var bot2 = 0.0
+var bot3 = 0.0
+
+var priceBot1 = 0.0
+var priceBot2 = 0.0
+var priceBot3 = 0.0
+
+var bot1Time = 0
+var bot2Time = 0
+var bot3Time = 0
+
+var bot1BarIndex = 0
+var bot2BarIndex = 0
+var bot3BarIndex = 0
+
+var masterBotTime = 0
+var masterBotBarIndex = 0
+var masterBotRsiValue = 0.0
+var masterBotPriceValue = 0.0
+
+if (isBot)
+    bot3 := bot2
+    bot2 := bot1
+    bot1 := current
+    priceBot3 := priceBot2
+    priceBot2 := priceBot1
+    priceBot1 := priceTopBotSource == "close" ? close[confirmation] : low[confirmation]
+    bot3Time := bot2Time
+    bot2Time := bot1Time
+    bot1Time := time[confirmation]
+    bot3BarIndex := bot2BarIndex
+    bot2BarIndex := bot1BarIndex
+    bot1BarIndex := bar_index[confirmation]
+
+isMasterBot = bot3 > bot2 and bot2 < bot1  and bot2 < oversell
+
+if (isMasterBot)
+    masterBotTime := bot2Time
+    masterBotBarIndex := bot2BarIndex
+    masterBotRsiValue := bot2
+    masterBotPriceValue := priceBot2
+
+if (bot1BarIndex - masterBotBarIndex > maxLoopback)
+    masterBotTime := 0
+    masterBotBarIndex := 0
+    masterBotRsiValue := 0.0
+    masterBotPriceValue := 0.0
+
+isBullDiv = isBot and not isMasterBot and bot1 < botLimit and bot1 > masterBotRsiValue and priceBot1 < masterBotPriceValue and bot1BarIndex - masterBotBarIndex <= maxLoopback
+
+var line bullDivLine = na
+if (isBullDiv)
+    bullDivLine := line.new(x1=masterBotTime, y1=masterBotRsiValue, x2=bot1Time, y2=bot1, color=color.new(divLineColor, 0), xloc=xloc.bar_time, style=line.style_solid, width=1)
+    
+
+plotshape(isBullDiv and showToBotDiv ? current - 10 : na, style=shape.triangleup, location= location.absolute, color=botColor, offset=-confirmation, size= size.tiny)
+
+
+isShortBotPeak = isBot and priceBot1 < masterBotPriceValue and bot1 > masterBotRsiValue
+plotshape(isShortBotPeak ? current - 20 : na, style=shape.labelup, location= location.absolute, text="☆", textcolor=textColor , color=botColor, offset=-confirmation, size= size.tiny,editable=true)
+
+
+isShortTopPeak = isTop and masterTopPriceValue < priceTop1 and top1 < masterTopRsiValue
+plotshape(isShortTopPeak ? current + 20 : na, style=shape.labeldown, location= location.absolute, text="☆", textcolor=textColor , color=topColor, offset=-confirmation, size= size.tiny,editable=true)
+
+
+isPredTop = true
+for i = 0 to (loopback + confirmation)
+    if mf[i] > mf or current < 50
+        isPredTop := false
+        
+isOverSell = false
+for i = 0 to (minLoopback)
+    if mf[i] > rsi_ratio_top[i] and mf > 50
+        isOverSell := true
+        
+// plot(isOverSell?1:0 , "isOverSell")
+// plot(isTop?1:0 , "isTop")
+// plot(isPredTop?1:0 , "isPredTop")
+//not isTop,=>fast isPredTop + isOverSell
+plotshape(isPredTop and isOverSell ? current + 20 : na, style=shape.labeldown, location= location.absolute, text="☆", textcolor=textColor , color=bigOverBuyColor, size= size.tiny,editable=true)
+
+
+length = input(16, minval=1)
+source = input(close, "Source", type   = input.source)
+roc = 100 * (source - source[length])/source[length]
+
+mfi_roc = sqrt(_rsi2*(roc))
+plot(mfi_roc, color=#2962FF, title="mfi_roc")
+

@@ -1,0 +1,56 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © yechankun, redniche, minyks
+//@version=4
+strategy(shorttitle="일목 기준선 이격도", title="기준선 이격", default_qty_type=strategy.percent_of_equity, commission_value=0.04, default_qty_value=100,process_orders_on_close=true)
+
+
+ilmok = input(26, minval=1, title="Length")
+ilmok2 = input(104, minval=1, title="Length")
+ilmok3 = input(416, minval=1, title="Length")
+src = input(close, title="Source")
+
+
+overmiddle        = input(0, type=input.float, title="Overmiddle", minval=0, maxval=100, group = "Overbuy - Oversell")
+
+donchian(len) => avg(lowest(len), highest(len))
+
+
+
+obOsLineColor = input(title="Overbuy / oversell line", type=input.color, defval=color.white)
+hline(overmiddle, linestyle= hline.style_dotted, color=obOsLineColor)
+
+baseLine = donchian(ilmok)
+baseLine2 = donchian(ilmok2)
+baseLine3 = donchian(ilmok3)
+
+
+gab = baseLine -baseLine3
+gab2 = baseLine2 -baseLine3
+donchian2(source, len) => avg(lowest(source, len), highest(source, len))
+gab3 = avg(gab, gab2)
+
+plot(gab, color=color.white, linewidth=2)
+plot(gab2, color=color.green, linewidth=2)
+plot(gab3, color=color.blue, linewidth=2)
+
+
+if(not input(true, "교차 API 사용=true 컨펌봉 사용=false", group="Strategy"))
+    isLong = gab > 0 and gab2 >0
+    lcount = 0
+    lcount := isLong ? nz(lcount[1]) + 1 : 0
+    isShort = gab < 0 and gab2 < 0
+    scount = 0
+    scount := isShort ? nz(scount[1]) + 1 : 0
+    
+    confirmBars = input(1, "컨펌 봉 수", group="Strategy")
+    
+    if (lcount == confirmBars)
+    	strategy.entry("Long", strategy.long, comment="Long Open")
+    	
+    if (scount == confirmBars)
+    	strategy.entry("Short", strategy.short, comment="Short Open")
+else
+    if (crossover(gab3, 0))
+    	strategy.entry("Long", strategy.long, comment="Long Open")
+    if (crossunder(gab3, 0))
+    	strategy.entry("Short", strategy.short, comment="Short Open")

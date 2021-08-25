@@ -1,0 +1,271 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © yechankun, redniche, minyks
+// MA Created by user ChrisMoody 4-24-2014...Updated 7/28/2014 added Tilson T3
+
+//@version=4
+strategy(shorttitle="Ichimoku Cloud 4 + MA 240 B.T", title="Ichimoku_MA_Cross_Backtesting", overlay=true, default_qty_type=strategy.percent_of_equity, commission_value=0.04, default_qty_value=100,process_orders_on_close=true)
+// strategy.risk.allow_entry_in(strategy.direction.long)
+
+/////////////Ichimoku input
+
+conversionPeriods = input(9, minval=1, title="Conversion Line Length", group="Ichimoku")
+basePeriodSmall = input(26, minval=1, title="Base Line Length", group="Ichimoku")
+basePeriods = input(104, minval=1, title="Base Line Length1", group="Ichimoku")
+basePeriods2 = input(416, minval=1, title="Base Line Length2", group="Ichimoku")
+basePeriods3 = input(1664, minval=1, title="Base Line Length3", group="Ichimoku")
+
+laggingSpan2Periods = input(52, minval=1, title="Lagging Span 2 Length", group="Ichimoku")
+displacement = input(26, minval=1, title="Displacement", group="Ichimoku")
+
+
+/////////////MA input
+
+useCurrentRes = input(true, title="Use Current Chart Resolution?", group="MA")
+resCustom = input(title="Use Different Timeframe? Uncheck Box Above", type=input.resolution, defval="D", group="MA")
+len = input(240, title="Moving Average Length - LookBack Period", group="MA")
+lenMA960 = input(960, title="Moving Average Length - Big, default = 960", group="MA") /////////////MA 960
+lenMA60 = input(60, title="Moving Average Length - Small, default = 60", group="MA") /////////////MA 60
+
+//periodT3 = input(defval=7, title="Tilson T3 Period", minval=1) 
+factorT3 = input(defval=7, title="Tilson T3 Factor - *.10 - so 7 = .7 etc.", minval=0, group="MA") 
+atype = input(1,minval=1,maxval=8,title="1=SMA, 2=EMA, 3=WMA, 4=HullMA, 5=VWMA, 6=RMA, 7=TEMA, 8=Tilson T3", group="MA")
+spc=input(false, title="Show Price Crossing 1st Mov Avg - Highlight Bar?", group="MA")
+cc = input(true,title="Change Color Based On Direction?", group="MA")
+smoothe = input(2, minval=1, maxval=10, title="Color Smoothing - Setting 1 = No Smoothing", group="MA")
+doma2 = input(false, title="Optional 2nd Moving Average", group="MA")
+spc2=input(false, title="Show Price Crossing 2nd Mov Avg?", group="MA")
+len2 = input(50, title="Moving Average Length - Optional 2nd MA", group="MA")
+sfactorT3 = input(defval=7, title="Tilson T3 Factor - *.10 - so 7 = .7 etc.", minval=0, group="MA")
+atype2 = input(1,minval=1,maxval=8,title="1=SMA, 2=EMA, 3=WMA, 4=HullMA, 5=VWMA, 6=RMA, 7=TEMA, 8=Tilson T3", group="MA")
+cc2 = input(true,title="Change Color Based On Direction 2nd MA?", group="MA")
+warn = input(false, title="***You Can Turn On The Show Dots Parameter Below Without Plotting 2nd MA to See Crosses***", group="MA")
+warn2 = input(false, title="***If Using Cross Feature W/O Plotting 2ndMA - Make Sure 2ndMA Parameters are Set Correctly***", group="MA")
+sd = input(false, title="Show Dots on Cross of Both MA's", group="MA")
+
+
+
+/////////////BB Input
+isBB = input(true, title="Use BB", group = "BB")
+length = input(240, minval=1, group="BB")
+src_bb = input(close, title="Source", group="BB")
+
+/////////////BB #N Input
+mult1 = input(1.0, minval=0.001, maxval=50, title="BB#1 StdDev", group="BB") //#1
+mult2 = input(2.0, minval=0.001, maxval=50, title="BB#2 StdDev", group="BB") //#2
+mult3 = input(3.0, minval=0.001, maxval=50, title="BB#3 StdDev", group="BB") //#3
+mult4 = input(4.5, minval=0.001, maxval=50, title="BB#4 StdDev", group="BB") //#3
+offset = input(0, "Offset", type = input.integer, minval = -500, maxval = 500, group="BB")
+
+
+/////////////Ichimoku
+
+donchian(len) => avg(lowest(len), highest(len))
+
+price = close
+conversionLine = donchian(conversionPeriods)
+baseLineSmall = donchian(basePeriodSmall)
+baseLine = donchian(basePeriods)
+baseLine2 = donchian(basePeriods2)
+baseLine3 = donchian(basePeriods3)
+leadLine1 = avg(conversionLine, baseLine)
+leadLine2 = donchian(laggingSpan2Periods)
+
+
+
+long = crossover(conversionLine,baseLine)
+short = crossunder(conversionLine,baseLine)
+
+plot(conversionLine, color=#ffcc00, linewidth=1, title="Conversion Line", display=display.none)
+plot(baseLineSmall, color=#00bcd4, linewidth=1, title="Base Line")
+plot(baseLine, color=#ff3300, linewidth=1, title="Base Line1")
+plot(baseLine2, color=#00cc00, linewidth=2, title="Base Line2")
+plot(baseLine3, color=#ffffff, linewidth=3, title="Base Line3", display=display.none)
+
+plot(close, offset = -displacement + 1, color=#459915, title="Lagging Span", display=display.none)
+p1 = plot(leadLine1, offset = displacement - 1, color=color.green,
+   title="Lead 1", display=display.none)
+p2 = plot(leadLine2, offset = displacement - 1, color=color.red,
+   title="Lead 2", display=display.none)
+fill(p1, p2, color = leadLine1 > leadLine2 ? color.green : color.red)
+
+
+////////////////////////////////////////////////////////////////////////
+/////////////MA
+
+//Created by user ChrisMoody 4-24-2014...Updated 7/28/2014 added Tilson T3
+//Modified on 5-5-14 for 4apprentice08 with Optional BarColor based on Price  Crossing MA #1, or #2
+//Modified on 7-25-2014 to Add in Tilson T3
+//Plots The Majority of Moving Averages
+//Defaults to Current Chart Time Frame --- But Can Be Changed to Higher Or Lower Time Frames
+//2nd MA Capability with Show Crosses Feature
+src=close
+
+out_ma960= sma(src, lenMA960)
+out_ma60= sma(src, lenMA60)
+plot(out_ma960, color=color.rgb(103,58,183), linewidth=3, title="MA_960", offset=1)
+plot(out_ma60, color=color.rgb(41,98,255), linewidth=3, title="MA_60", offset=1)
+
+
+res = useCurrentRes ? timeframe.period : resCustom
+//hull ma definition
+hullma = wma(2*wma(src, len/2)-wma(src, len), round(sqrt(len)))
+//TEMA definition
+ema1 = ema(src, len)
+ema2 = ema(ema1, len)
+ema3 = ema(ema2, len)
+tema = 3 * (ema1 - ema2) + ema3
+
+//Tilson T3
+factor = factorT3 *.10
+gd(src, len, factor) => ema(src, len) * (1 + factor) - ema(ema(src, len), len) * factor 
+t3(src, len, factor) => gd(gd(gd(src, len, factor), len, factor), len, factor) 
+tilT3 = t3(src, len, factor) 
+ 
+
+avg = atype == 1 ? sma(src,len) : atype == 2 ? ema(src,len) : atype == 3 ? wma(src,len) : atype == 4 ? hullma : atype == 5 ? vwma(src, len) : atype == 6 ? rma(src,len) : atype == 7 ? 3 * (ema1 - ema2) + ema3 : tilT3
+//2nd Ma - hull ma definition
+hullma2 = wma(2*wma(src, len2/2)-wma(src, len2), round(sqrt(len2)))
+//2nd MA TEMA definition
+sema1 = ema(src, len2)
+sema2 = ema(sema1, len2)
+sema3 = ema(sema2, len2)
+stema = 3 * (sema1 - sema2) + sema3
+
+//2nd MA Tilson T3
+sfactor = sfactorT3 *.10
+sgd(src, len2, sfactor) => ema(src, len2) * (1 + sfactor) - ema(ema(src, len2), len2) * sfactor 
+st3(src, len2, sfactor) => sgd(sgd(gd(src, len2, sfactor), len2, sfactor), len2, sfactor) 
+stilT3 = st3(src, len2, sfactor) 
+
+avg2 = atype2 == 1 ? sma(src,len2) : atype2 == 2 ? ema(src,len2) : atype2 == 3 ? wma(src,len2) : atype2 == 4 ? hullma2 : atype2 == 5 ? vwma(src, len2) : atype2 == 6 ? rma(src,len2) : atype2 == 7 ? 3 * (ema1 - ema2) + ema3 : stilT3
+
+out = avg 
+out_two = avg2
+
+out1 = security(syminfo.ticker, res, out)
+out2 = security(syminfo.ticker, res, out_two)
+
+//Formula for Price Crossing Moving Average #1
+cr_up = open < out1 and close > out1
+cr_Down = open > out1 and close < out1
+//Formula for Price Crossing Moving Average #2
+cr_up2 = open < out2 and close > out2
+cr_Down2 = open > out2 and close < out2
+//barcolor Criteria for Price Crossing Moving Average #1
+iscrossUp() => cr_up
+iscrossDown() => cr_Down
+//barcolor Criteria for Price Crossing Moving Average #2
+iscrossUp2() => cr_up2
+iscrossDown2() => cr_Down2
+
+ma_up = out1 >= out1[smoothe]
+ma_down = out1 < out1[smoothe]
+
+col = cc ? ma_up ? color.lime : ma_down ? color.red : color.aqua : color.aqua
+col2 = cc2 ? ma_up ? color.lime : ma_down ? color.red : color.aqua : color.white
+
+circleYPosition = out2
+
+plot(out1, title="Multi-Timeframe Moving Avg", style=plot.style_line, linewidth=4, color = col)
+plot(doma2 and out2 ? out2 : na, title="2nd Multi-TimeFrame Moving Average", style=plot.style_circles, linewidth=4, color=col2)
+plot(sd and cross(out1, out2) ? circleYPosition : na,style=plot.style_cross, linewidth=15, color=color.aqua)
+//barcolor Plot for Price Crossing Moving Average #1
+barcolor(spc and iscrossUp() ? (iscrossUp() ? color.yellow : na) : na)
+barcolor(spc and iscrossDown() ? (iscrossDown() ? color.yellow : na) : na)
+//barcolor Plot for Price Crossing Moving Average #2
+barcolor(spc2 and iscrossUp2() ? (iscrossUp2() ? color.yellow : na) : na)
+barcolor(spc2 and iscrossDown2() ? (iscrossDown2() ? color.yellow : na) : na)
+
+
+
+/////////////BB
+basis = sma(src_bb, length)
+
+
+dev1 = mult1 * stdev(src_bb, length)
+upper1 = basis + dev1
+lower1 = basis - dev1
+
+dev2 = mult2 * stdev(src_bb, length)
+upper2 = basis + dev2
+lower2 = basis - dev2
+
+dev3 = mult3 * stdev(src_bb, length)
+upper3 = basis + dev3
+lower3 = basis - dev3
+
+dev4 = mult4 * stdev(src_bb, length)
+upper4 = basis + dev4
+lower4 = basis - dev4
+    
+plot(isBB ? basis:na, "Basis", color=#FF6D00, offset = offset, display=display.none)
+p11 = plot(isBB ? upper1:na, "BB_Upper1", color=#4caf50, offset = offset)
+p21 = plot(isBB ? lower1:na, "BB_Lower1", color=#4caf50, offset = offset)
+fill(p11, p21, title = "BB_Background1", color=color.rgb(76,175,80,100)) 
+    
+p12 = plot(isBB ? upper2:na, "BB_Upper2", color=#ffeb3b, offset = offset)
+p22 = plot(isBB ? lower2:na, "BB_Lower2", color=#ffeb3b, offset = offset)
+fill(p12, p22, title = "BB_Background2", color=color.rgb(255,235,59,100))
+
+p13 = plot(isBB ? upper3:na, "BB_Upper3", color=#f44336, offset = offset)
+p23 = plot(isBB ? lower3:na, "BB_Lower3", color=#f44336, offset = offset)
+fill(p13, p23, title = "BB_Background3", color=color.rgb(244,67,54,100))
+
+p14 = plot(isBB ? upper4:na, "BB_Upper4", color=#ff9800, offset = offset)
+p24 = plot(isBB ? lower4:na, "BB_Lower4", color=#ff9800, offset = offset)
+fill(p13, p23, title = "BB_Background4", color=color.rgb(255,152,0,100))
+
+
+
+//Stratergy
+strategy.risk.allow_entry_in(input(strategy.direction.all, title="Position direction: All, Long, Short", group="Strategy"))
+isCrossAPI = input(true, "Use CrossAPI?", group="Strategy")
+confirmBars = input(1, "Entry confirmation - Not CorssAPI Only", group="Strategy")
+
+isShortOpen = false
+var isBase2CrossCnt = 0
+
+if(not isCrossAPI)
+    bcond = baseLine > out1
+    bcount = 0
+    bcount := bcond ? nz(bcount[1]) + 1 : 0
+    scond = baseLine < out1
+    scount = 0
+    scount := scond ? nz(scount[1]) + 1 : 0
+    
+    
+    if (bcount == confirmBars)
+        isBase2CrossCnt := 0
+    	strategy.entry("Long", strategy.long, comment="Long Open")
+    	
+    if (scount == confirmBars)
+    	isBase2CrossCnt := 0
+    	strategy.entry("Short", strategy.short, comment="Short Open")
+else
+    if (crossover(baseLine, out1))
+        isBase2CrossCnt := 0
+    	strategy.entry("Long", strategy.long, comment="Long Open")
+    if (crossunder(baseLine, out1))
+        isBase2CrossCnt := 0
+    	strategy.entry("Short", strategy.short, comment="Short Open")
+
+
+//#테스트 코드
+if(input(false, title="Use test code", group="Strategy"))
+    baseLine2_ma = sma(baseLine2, 9)
+    bcond = baseLine2_ma > out1
+    bcount = 0
+    bcount := bcond ? nz(bcount[1]) + 1 : 0
+    scond = baseLine2_ma < out1
+    scount = 0
+    scount := scond ? nz(scount[1]) + 1 : 0
+    
+    if (bcount == 2)
+        isBase2CrossCnt += 1
+    if (scount == 2)
+    	isBase2CrossCnt += 1
+        
+    if(strategy.position_size < 0)
+        strategy.close("Short", when=isBase2CrossCnt == 3)
+        strategy.entry("Long", strategy.long, comment="Long Open", when=isBase2CrossCnt == 3)
+    
